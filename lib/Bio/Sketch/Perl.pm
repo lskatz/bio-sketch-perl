@@ -20,11 +20,16 @@ our $VERSION = 0.1;
 
 our @EXPORT_OK = qw(raw_mash_distance);
 
+our $startTime = time();
+
 local $0=basename $0;
 
 # These functions are unimplemented but have to be
 # listed because of the interface.
 sub paste{
+  ...;
+}
+sub dist{
   ...;
 }
 
@@ -62,7 +67,9 @@ TODO
 Create a new instance of Bio::Sketch::Perl.  One object per set of files.
 
   Arguments:  File to sketch (valid extensions: fastq.gz, fq.gz)
-              Hash of options (none so far)
+              Hash of options
+                sketchSize => 1000,
+                kmerlength => 21,
   Returns:    Bio::Sketch::Perl object
 
 =back
@@ -71,6 +78,7 @@ Create a new instance of Bio::Sketch::Perl.  One object per set of files.
 
 sub new{
   my($class,$filename,$settings)=@_;
+  $settings //= {};
 
   # List all possible properties here;
   # set sane defaults
@@ -85,20 +93,32 @@ sub new{
     hashBits  => 64,
     hashSeed  => 42,
     bloomFilter =>undef, # type Bloom::Filter
-    bloomFilterCapacity => 1e8,  # >1
-    bloomFilterErrorRate=> 1e-3, # between zero and one
+    bloomFilterCapacity => 1e5,  # >1
+    bloomFilterErrorRate=> 1e-6, # between zero and one
     sketches  => [], # Array of hashes. Each hash has keys
                      #  name    => original filename
                      #  length  => integer of estimated genome size
                      #  comment => string description
                      #  hashes  => list of integers
   };
-  bless($self,$class);
+  
+  # Set some things from $settings
+  for my $key(qw(sketchSize kmerlength)){
+    if(defined($$settings{$key})){
+      $$self{$key} = $$settings{$key};
+    }
+  }
 
   $$self{bloomFilter} = Bloom::Filter->new(
     capacity    => $$self{bloomFilterCapacity},
     error_rate  => $$self{bloomFilterErrorRate},
   );
+  # Make the bloom filter a bit more deterministic
+  my $salts = $$self{bloomFilter}{salts};
+  $$self{bloomFilter}{salts} = [sort{ $a <=> $b } @$salts];
+  # Avoid the warning that we are exceeding capacity
+  # by setting the capacity after BF->new()
+  $$self{bloomFilter}{capacity} = 1e8;
 
   if(!defined($filename)){
     die "ERROR: no file was given to ".$class."->new";
@@ -107,6 +127,9 @@ sub new{
   if(!-e $filename){
     die "ERROR: could not find file $filename";
   }
+
+  # Bless this mess
+  bless($self,$class);
 
   $self->sketch($filename);
 
@@ -138,37 +161,62 @@ sub sketch{
   my @hashBuffer;
   my $numHashes;
   my $kmerCounts = $kmerObj->kmers;
-  while(my($kmer, $count) = each(%$kmerCounts)){
-    my($v1,$v2,$v3,$v4) = murmur32($kmer, $$self{hashSeed});
-    #$$self{bloomFilter}->add($v1);
-    push(@hashBuffer, $v1);
+  my @sortedKmer = sort keys(%$kmerCounts);
+  for my $kmer(@sortedKmer){
+    # poor man's quick hashing
+    #my $v = crypt($kmer, $$self{hashSeed});
+    #$v =~ s/\D+//g;
+    #$v = reverse($v);
+
+    my ($v, $v2) = murmur32($kmer, $$self{hashSeed});
+    push(@hashBuffer, $v);
 
     # If the number of hashes gets too large,
     # flush the buffer.
-    if(@hashBuffer % 1e3 == 0){
+    if(@hashBuffer % 1e1 == 0){
       #carp "Adding ".scalar(@hashBuffer)." keys";
       $$self{bloomFilter}->add(@hashBuffer);
       @hashBuffer=();
-      carp "DEBUG"; last;
+      #carp "DEBUG on number of kmers"; last;
     }
   }
   # Add the rest of the keys that have not been flushed yet
   $$self{bloomFilter}->add(@hashBuffer);
 
-  my $filterStr = unpack("b*", $$self{bloomFilter}{filter});
-  my $filterLength = length($filterStr);
-  carp "DEBUG"; $filterLength = 1e8;
+  my $setbits = unpack("b*", $$self{bloomFilter}{filter});
+
   my @onBits;
-  for(my $i=0;$i<$filterLength;$i++){
-    if(substr($filterStr,$i,1) == 1){
-      push(@onBits, $i);
+  my $i=0;
+  my $bufferSize = 50000;
+  while($setbits){
+    my $buffer = substr($setbits, 0, $bufferSize, "");
+    
+    # Test the whole buffer at once. If there is a one
+    # anywhere in the string, then test individually.
+    if($buffer !~ /1/){
+      $i+=$bufferSize;
+      next;
+    }
+
+    # If we made it this far, then the buffer has a one
+    # in it somewhere and we'd like to know where.
+    while($buffer){
+      my $bool = substr($buffer,0,1,"");
+      if($bool == 1){
+        push(@onBits, $i);
+      }
+      $i++;
     }
   }
+
+  # Keep minimum $sketchSize hashes
+  @onBits = sort {$a<=>$b} @onBits;
+  splice(@onBits, $$self{sketchSize});
 
   # Try to match the mash info -d syntax
   my %sketch = (
     name   => $filename,
-    length => 0, # TODO total number of bp
+    length => $kmerObj->ntcount, # TODO total number of bp
     # TODO comment, e.g., "[2222 seqs] M04624:8:000000000-BFRRJ:1:1101:15905:1382 1:N:0:NGTACTAG+GCGTNAGA [...]",
     comment => "[$numseqs seqs] $firstSeqid $nextseqs",
     hashes => \@onBits,

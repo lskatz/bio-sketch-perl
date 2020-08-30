@@ -7,20 +7,20 @@ use File::Spec;
 use FindBin qw/$RealBin/;
 use lib "$RealBin/../lib";
 use lib "$RealBin/../lib/perl5";
+BEGIN{$ENV{TEST_RANDOM_SEED} //= 42;}
+use Test::Random;
 
-use Test::More tests=>1;
+use Test::More tests=>2;
 use_ok("Bio::Sketch::Perl");
 
-my $msh = Bio::Sketch::Perl->new("$RealBin/data/PNUSAL003567_R1_.fastq.gz"); 
-$msh->writeJson("$RealBin/data/PNUSAL003567_R1_.fastq.gz.msh.json");
+subtest 'Sketch R1' => sub{
+  my @expectedHash = (
+    0, 1, 3, 4, 5, 6, 7, 9, 10, 11
+  );
+  my $msh = Bio::Sketch::Perl->new("$RealBin/data/PNUSAL003567_R1_.fastq.gz",{
+    sketchSize => 10,
+  });
 
-my $mashInfo = `mash info -d $RealBin/data/PNUSAL003567_R1_.fastq.gz.msh`;
-my $jsonInfo = `cat $RealBin/data/PNUSAL003567_R1_.fastq.gz.msh.json`;
-
-my $json=JSON->new;
-$json->utf8;           # If we only expect characters 0..255. Makes it fast.
-$json->allow_nonref;   # can convert a non-reference into its corresponding string
-$json->allow_blessed;  # encode method will not barf when it encounters a blessed reference
-$json->pretty;         # enables indent, space_before and space_after
-
-is_deeply($json->decode($mashInfo), $json->decode($jsonInfo), "Read/write R1");
+  is_deeply($$msh{sketches}[0]{hashes}, \@expectedHash, "Expected hashes");
+  #die Dumper($$msh{sketches}[0]{hashes});
+}
