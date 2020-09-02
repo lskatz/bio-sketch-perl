@@ -16,9 +16,12 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.1;
+our $VERSION = 0.2;
 
 our @EXPORT_OK = qw(raw_mash_distance);
+
+use overload
+  '""' => 'toString';
 
 our $startTime = time();
 
@@ -95,7 +98,7 @@ sub new{
     bloomFilter =>undef, # type Bloom::Filter
     bloomFilterCapacity => 1e5,  # >1
     bloomFilterErrorRate=> 1e-6, # between zero and one
-    sketches  => [], # Array of hashes. Each hash has keys
+    sketch    => {}, #  each element has keys
                      #  name    => original filename
                      #  length  => integer of estimated genome size
                      #  comment => string description
@@ -154,88 +157,64 @@ sub sketch{
   my $firstSeqid = "firstseqid";
   my $nextseqs = "[...]";
 
-
+  # Count kmers the perl way
   my $kmerObj = Bio::Kmer->new($filename,{
     kmerlength=>$$self{kmerlength},
   });
-  my @hashBuffer;
-  my $numHashes;
-  my $kmerCounts = $kmerObj->kmers;
-  my @sortedKmer = sort keys(%$kmerCounts);
-  for my $kmer(@sortedKmer){
-    # poor man's quick hashing
-    #my $v = crypt($kmer, $$self{hashSeed});
-    #$v =~ s/\D+//g;
-    #$v = reverse($v);
+  my $kmerCountsRaw = $kmerObj->kmers;
 
-    my ($v, $v2) = murmur32($kmer, $$self{hashSeed});
-    push(@hashBuffer, $v);
-
-    # If the number of hashes gets too large,
-    # flush the buffer.
-    if(@hashBuffer % 1e1 == 0){
-      #carp "Adding ".scalar(@hashBuffer)." keys";
-      $$self{bloomFilter}->add(@hashBuffer);
-      @hashBuffer=();
-      #carp "DEBUG on number of kmers"; last;
-    }
-  }
-  # Add the rest of the keys that have not been flushed yet
-  $$self{bloomFilter}->add(@hashBuffer);
-
-  my $setbits = unpack("b*", $$self{bloomFilter}{filter});
-
-  my @onBits;
-  my $i=0;
-  my $bufferSize = 50000;
-  while($setbits){
-    my $buffer = substr($setbits, 0, $bufferSize, "");
-    
-    # Test the whole buffer at once. If there is a one
-    # anywhere in the string, then test individually.
-    if($buffer !~ /1/){
-      $i+=$bufferSize;
-      next;
-    }
-
-    # If we made it this far, then the buffer has a one
-    # in it somewhere and we'd like to know where.
-    while($buffer){
-      my $bool = substr($buffer,0,1,"");
-      if($bool == 1){
-        push(@onBits, $i);
-      }
-      $i++;
-    }
+  # TODO filter kmers with count < X
+  my %kmerCounts;
+  while(my($kmer,$count)=each(%$kmerCountsRaw)){
+    next if($count < 5);
+    $kmerCounts{$kmer}=$count;
   }
 
-  # Keep minimum $sketchSize hashes
-  @onBits = sort {$a<=>$b} @onBits;
-  splice(@onBits, $$self{sketchSize});
+  # For all kmers,
+  # murmer32 hash them.
+  # Next, sort numerically.
+  my @sortedHash = sort{$a <=> $b}
+                   map {(murmur32($_, $$self{hashSeed}))[0]}
+                   keys(%kmerCounts);
+  # Here is the part where we only keep the min hashes
+  my @minHash    = splice(@sortedHash,0,$$self{sketchSize});
 
-  # Try to match the mash info -d syntax
+  $$self{bloomFilter}->add(@minHash);
+
   my %sketch = (
     name   => $filename,
-    length => $kmerObj->ntcount, # TODO total number of bp
+    length => $kmerObj->ntcount,
     # TODO comment, e.g., "[2222 seqs] M04624:8:000000000-BFRRJ:1:1101:15905:1382 1:N:0:NGTACTAG+GCGTNAGA [...]",
-    comment => "[$numseqs seqs] $firstSeqid $nextseqs",
-    hashes => \@onBits,
+    comment=> "[$numseqs seqs] $firstSeqid $nextseqs",
+    #filter  => $$self{bloomFilter}{filter},
+    hashes => \@minHash,
+    kmer   => $$self{kmerlength},
+    alphabet => "ACGT", # TODO actually make that determination
+    preserveCase => 0,
+    canonical    => 1,
+    sketchSize   => $$self{sketchSize},
+    hashType     => "murmur32",
+    hashBits     => 32,
+    hashSeed     => $$self{hashSeed},
   );
-  push(@{$$self{sketches}}, \%sketch);
+  $$self{sketch} = \%sketch;
 
-  return \%sketch;
+  return 1;
+}
+
+sub info{
+  my($self) = @_;
+
+  return $$self{sketch}
 }
 
 ##### Utility methods
 
 sub toString{
   my($self)=@_;
-  my $return=ref($self)." object with " .scalar(@{ $self->{sketches} })." file(s):\n";
-  for my $sketch(@{ $self->{sketches} }){
-    $return.=$$sketch{name}."\n";
-  }
-  
-  return $return;
+
+  my %sketch = %{ $$self{sketch} };
+  return Dumper \%sketch;
 }
 
 =pod
