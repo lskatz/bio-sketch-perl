@@ -16,7 +16,7 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.3;
+our $VERSION = 0.4;
 
 our @EXPORT_OK = qw();
 
