@@ -10,4 +10,6 @@ addons:
       - bioperl
 perl:
   - "5.24-shrplib"
+before_install:
+  - yes no | cpanm -l . Bio::Perl
 
