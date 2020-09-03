@@ -8,7 +8,7 @@ use File::Basename qw/fileparse basename dirname/;
 use Data::Dumper;
 use Bio::Kmer;
 use Digest::MurmurHash3 qw/murmur32/;
-use Bloom::Filter;
+#use Bloom::Filter;
 use Carp qw/carp croak/;
 
 use JSON ();
@@ -94,9 +94,9 @@ sub new{
     hashBits  => 64,
     hashSeed  => 42,
     minCopies => 1, 
-    bloomFilter =>undef, # type Bloom::Filter
-    bloomFilterCapacity => 1e5,  # >1
-    bloomFilterErrorRate=> 1e-6, # between zero and one
+    #bloomFilter =>undef, # type Bloom::Filter
+    #bloomFilterCapacity => 1e5,  # >1
+    #bloomFilterErrorRate=> 1e-6, # between zero and one
     sketch    => {}, #  each element has keys
                      #  name    => original filename
                      #  length  => integer of estimated genome size
@@ -105,22 +105,22 @@ sub new{
   };
   
   # Set some things from $settings
-  for my $key(qw(sketchSize kmerlength minCopies)){
+  for my $key(qw(hashSeed sketchSize kmerlength minCopies)){
     if(defined($$settings{$key})){
       $$self{$key} = $$settings{$key};
     }
   }
 
-  $$self{bloomFilter} = Bloom::Filter->new(
-    capacity    => $$self{bloomFilterCapacity},
-    error_rate  => $$self{bloomFilterErrorRate},
-  );
+  #$$self{bloomFilter} = Bloom::Filter->new(
+  #  capacity    => $$self{bloomFilterCapacity},
+  #  error_rate  => $$self{bloomFilterErrorRate},
+  #);
   # Make the bloom filter a bit more deterministic
-  my $salts = $$self{bloomFilter}{salts};
-  $$self{bloomFilter}{salts} = [sort{ $a <=> $b } @$salts];
+  #my $salts = $$self{bloomFilter}{salts};
+  #$$self{bloomFilter}{salts} = [sort{ $a <=> $b } @$salts];
   # Avoid the warning that we are exceeding capacity
   # by setting the capacity after BF->new()
-  $$self{bloomFilter}{capacity} = 1e8;
+  #$$self{bloomFilter}{capacity} = 1e8;
 
   if(!defined($filename)){
     die "ERROR: no file was given to ".$class."->new";
@@ -198,7 +198,7 @@ sub sketch{
   # Here is the part where we only keep the min hashes
   my @minHash    = splice(@sortedHash,0,$$self{sketchSize});
 
-  $$self{bloomFilter}->add(@minHash);
+  #$$self{bloomFilter}->add(@minHash);
 
   my %sketch = (
     name   => $filename,
