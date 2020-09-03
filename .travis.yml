@@ -13,6 +13,7 @@ perl:
   - "5.24-shrplib"
 before_install:
   - export PERL5LIB=$PERL5LIB:$(pwd)/lib/perl5
-  - find / -name Root.pm || true
+  - export PERL5LIB=$PERL5LIB:/usr/share/perl5
+    #- find / -name Root.pm || true # => /usr/share/perl5/Bio/Root/Root.pm
   - yes no | cpanm -l . Bio::Perl --force --notest
 
