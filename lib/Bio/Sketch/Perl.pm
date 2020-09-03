@@ -16,12 +16,12 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.4;
+our $VERSION = 0.5;
 
 our @EXPORT_OK = qw();
 
-use overload
-  '""' => 'toString';
+#use overload
+#  '""' => 'toString';
 
 our $startTime = time();
 
@@ -45,6 +45,7 @@ A module for sketching with pure perl
 
   use strict;
   use warnings;
+  use Data::Dumper;
   use Bio::Sketch::Perl;
 
   my $msh1 = Bio::Sketch::Perl->new("file1.fastq.gz");
@@ -53,6 +54,30 @@ A module for sketching with pure perl
   # Get a value between zero and one, where zero
   # indicates the same sketch profile.
   my $distHash = $msh->dist($msh2);
+
+  # Saving a sketch with Data::Dumper
+  my $filename = "./file1.fastq.gz.dmp";
+  open(my $fh, '>', $filename) or die "ERROR writing to $filename: $!";
+  print $fh $filename;
+  close $fh;
+
+  # Loading a sketch from Data::Dumper is easier with
+  # a subroutine
+  sub openDmp{
+    my($file) = @_;
+    local $/ = undef;
+    open(my $fh, $file) or BAIL_OUT("ERROR: could not open $file: $!");
+    my $str = <$fh>;
+    close $fh;
+
+    # Avoid an error with the way Data::Dumper saves
+    # objects in the syntax of $VAR1 = ...
+    # by turning off strict for just this eval.
+    no strict;
+    my $obj = eval $str;
+    return $obj;
+  }
+  my $loadedSketch = openDmp($filename);
 
 =head1 DESCRIPTION
 
@@ -90,8 +115,8 @@ sub new{
     alphabet  => "ACGT",
     canonical => 1,  # boolean
     sketchSize=> 1000,
-    hashType  => "MurmurHash3_x64_128",
-    hashBits  => 64,
+    hashType  => "MurmurHash32",
+    hashBits  => 32,
     hashSeed  => 42,
     minCopies => 1, 
     #bloomFilter =>undef, # type Bloom::Filter
