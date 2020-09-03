@@ -16,9 +16,9 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.2;
+our $VERSION = 0.3;
 
-our @EXPORT_OK = qw(raw_mash_distance);
+our @EXPORT_OK = qw();
 
 use overload
   '""' => 'toString';
@@ -30,9 +30,6 @@ local $0=basename $0;
 # These functions are unimplemented but have to be
 # listed because of the interface.
 sub paste{
-  ...;
-}
-sub dist{
   ...;
 }
 
@@ -73,6 +70,7 @@ Create a new instance of Bio::Sketch::Perl.  One object per set of files.
               Hash of options
                 sketchSize => 1000,
                 kmerlength => 21,
+                minCopies  => 1,    # minimum copies of each kmer required to pass noise filter
   Returns:    Bio::Sketch::Perl object
 
 =back
@@ -95,6 +93,7 @@ sub new{
     hashType  => "MurmurHash3_x64_128",
     hashBits  => 64,
     hashSeed  => 42,
+    minCopies => 1, 
     bloomFilter =>undef, # type Bloom::Filter
     bloomFilterCapacity => 1e5,  # >1
     bloomFilterErrorRate=> 1e-6, # between zero and one
@@ -106,7 +105,7 @@ sub new{
   };
   
   # Set some things from $settings
-  for my $key(qw(sketchSize kmerlength)){
+  for my $key(qw(sketchSize kmerlength minCopies)){
     if(defined($$settings{$key})){
       $$self{$key} = $$settings{$key};
     }
@@ -139,7 +138,27 @@ sub new{
   return $self;
 }
 
-# DOCUMENTATION TODO
+=pod
+
+=over
+
+=item $msh->sketch
+
+Sketches a file. Internally uses Bio::Kmer and murmur32().
+
+Usually you do not call this subroutine directly; it is
+called directly from new().
+
+Arguments: filename  String describing a path to the file.
+
+Returns: $self->{sketch} which is a hash
+
+Internally sets $self->{sketch}.
+
+=back
+
+=cut
+
 sub sketch{
   my($self, $filename) = @_;
   if(!defined($$self{hashSeed}) || $$self{hashSeed} < 0){
@@ -166,7 +185,7 @@ sub sketch{
   # TODO filter kmers with count < X
   my %kmerCounts;
   while(my($kmer,$count)=each(%$kmerCountsRaw)){
-    next if($count < 5);
+    next if($count < $$self{minCopies});
     $kmerCounts{$kmer}=$count;
   }
 
@@ -199,13 +218,100 @@ sub sketch{
   );
   $$self{sketch} = \%sketch;
 
-  return 1;
+  return \%sketch;
 }
+
+=pod
+
+=over
+
+=item $msh->info()
+
+Returns the sketch hash from $self->sketch()
+
+=back
+
+=cut
 
 sub info{
   my($self) = @_;
 
   return $$self{sketch}
+}
+
+=pod
+
+=over
+
+=item $msh->jaccard($otherMsh)
+
+Returns the jaccard distance of $msh compared to $otherMsh
+
+Arguments: otherMsh  Another sketch object
+
+Returns: a distance between zero and one
+
+=back
+
+=cut
+
+sub jaccard{
+  my($self, $other) = @_;
+
+  # TODO make sure the sketches have certain properties
+  # in common such as kmer length and hashing function.
+
+  # Make variable aliases so that it's easier to read
+  # the code downstream.
+  my $myHashes    = $$self{sketch}{hashes};
+  my $otherHashes = $$other{sketch}{hashes};
+  my $numSketches = $$self{sketchSize};
+
+  # Get a number of hashes in common with the other sketch.
+  # $i is the index of the hashes in the first sketch and 
+  # $j is the index of the hashes in the other sketch.
+  my $intersection=0;
+  my $i=0;
+  my $j=0;
+  while($i < $numSketches && $j < $numSketches){
+    my $cmp = $$myHashes[$i] <=> $$otherHashes[$j];
+
+    # myHash < otherHash
+    if($cmp == -1){ 
+      $i++;
+    }
+    # myHash == otherHash
+    elsif($cmp == 0){
+      $i++;
+      $j++;
+      $intersection++;
+    }
+    # myHash > otherHash
+    elsif($cmp == 1){
+      $j++;
+    }
+  }
+
+  return(1 - $intersection / $numSketches);
+}
+
+=pod
+
+=over
+
+=item $msh->dist($other)
+
+Currently an alias for $msh->jaccard
+
+Could become something more sophisticated in the future like a Mash distance.
+
+=back
+
+=cut
+
+sub dist{
+  my($self, $other) = @_;
+  return $self->jaccard($other);
 }
 
 ##### Utility methods
