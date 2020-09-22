@@ -1,0 +1,140 @@
+=pod
+
+=head1 NAME
+
+Bio::Sketch::Perl
+
+=head1 SYNOPSIS
+
+A module for sketching with pure perl.
+
+  use strict;
+  use warnings;
+  use Bio::Sketch::Perl;
+
+  my $msh1 = Bio::Sketch::Perl->new("file1.fastq.gz");
+  my $msh2 = Bio::Sketch::Perl->new("file2.fastq.gz");
+
+  # Get a value between zero and one, where zero
+  # indicates the same sketch profile.
+  my $distHash = $msh->dist($msh2);
+
+=head1 DESCRIPTION
+
+The idea here is to try to make functionality totally in perl if possible to avoid system calls.
+The truth though is that this implementation is quite slow and is not compatible with Mash.
+However, I will accept pull requests as long as they are captured in some unit testing.
+
+=head2 Workflow
+
+I took a lot of short cuts and I probably will never get around to making sure it is compatible with Mash,
+but I implemented the same kind of idea.
+
+=item Uses Bio::Kmer to get kmers from a file
+
+=item Gets a hash of each kmer with Digest::MurmurHash3::murmurhash32 (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
+
+=item After all hashes are added, they are sorted and the minimum integers are kept.
+
+=head1 METHODS
+
+=over
+
+=item Bio::Sketch::Perl->new(filePath,\%options);
+
+Create a new instance of Bio::Sketch::Perl.  One object per set of files.
+
+  Arguments:  File to sketch (valid extensions: fastq.gz, fq.gz)
+              Hash of options
+                sketchSize => 1000,
+                kmerlength => 21,
+                minCopies  => 1,    # minimum copies of each kmer required to pass noise filter
+  Returns:    Bio::Sketch::Perl object
+
+=back
+
+
+=cut
+
+=pod
+
+=over
+
+=item $msh->sketch
+
+Sketches a file. Internally uses Bio::Kmer and murmur32().
+
+Usually you do not call this subroutine directly; it is
+called directly from new().
+
+Arguments: filename  String describing a path to the file.
+
+Returns: $self->{sketch} which is a hash
+
+Internally sets $self->{sketch}.
+
+=back
+
+
+=cut
+
+=pod
+
+=over
+
+=item $msh->info()
+
+Returns the sketch hash from $self->sketch()
+
+=back
+
+
+=cut
+
+=pod
+
+=over
+
+=item $msh->jaccard($otherMsh)
+
+Returns the jaccard distance of $msh compared to $otherMsh
+
+Arguments: otherMsh  Another sketch object
+
+Returns: a distance between zero and one
+
+=back
+
+
+=cut
+
+=pod
+
+=over
+
+=item $msh->dist($other)
+
+Currently an alias for $msh->jaccard
+
+Could become something more sophisticated in the future like a Mash distance.
+
+=back
+
+
+=cut
+
+=pod
+
+=head1 COPYRIGHT AND LICENSE
+
+MIT license.
+
+=head1 AUTHOR
+
+Author:  Lee Katz <lkatz@cdc.gov>
+
+For additional help, go to https://github.com/lskatz/bio--mash--perl
+
+
+=cut
+
