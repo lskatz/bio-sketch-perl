@@ -1,0 +1,37 @@
+$VAR1 = bless( {
+                 'canonical' => 1,
+                 'hashBits' => 32,
+                 'preserveCase' => 0,
+                 'file' => 't/data/PNUSAL003567_R1_.fastq.gz',
+                 'kmerlength' => 8,
+                 'alphabet' => 'ACGT',
+                 'hashType' => 'MurmurHash32',
+                 'sketch' => {
+                               'canonical' => 1,
+                               'hashBits' => 32,
+                               'preserveCase' => 0,
+                               'name' => 't/data/PNUSAL003567_R1_.fastq.gz',
+                               'alphabet' => 'ACGT',
+                               'kmer' => 8,
+                               'hashType' => 'murmur32',
+                               'length' => 355404,
+                               'comment' => '[-1 seqs] firstseqid [...]',
+                               'hashSeed' => 42,
+                               'sketchSize' => 10,
+                               'hashes' => [
+                                             4338,
+                                             58643,
+                                             187309,
+                                             202460,
+                                             268610,
+                                             273874,
+                                             278855,
+                                             282031,
+                                             287278,
+                                             311811
+                                           ]
+                             },
+                 'hashSeed' => 42,
+                 'minCopies' => 1,
+                 'sketchSize' => 10
+               }, 'Bio::Sketch::Perl' );

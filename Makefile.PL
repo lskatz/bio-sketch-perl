@@ -36,7 +36,7 @@ WriteMakefile1(
     'inc::Module::Install' => 0,
     'Digest::MurmurHash3' => 0,
     #'Digest::MurmurHash2::Neutral' => 0,
-    'Bloom::Filter'  => 0,
+    #'Bloom::Filter'  => 0,
   },
   BUILD_REQUIRES => {
     'Test::More'     => 0.47,

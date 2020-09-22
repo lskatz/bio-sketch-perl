@@ -8,7 +8,7 @@ use File::Basename qw/fileparse basename dirname/;
 use Data::Dumper;
 use Bio::Kmer;
 use Digest::MurmurHash3 qw/murmur32/;
-use Bloom::Filter;
+#use Bloom::Filter;
 use Carp qw/carp croak/;
 
 use JSON ();
@@ -16,12 +16,12 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.3;
+our $VERSION = 0.5;
 
 our @EXPORT_OK = qw();
 
-use overload
-  '""' => 'toString';
+#use overload
+#  '""' => 'toString';
 
 our $startTime = time();
 
@@ -45,6 +45,7 @@ A module for sketching with pure perl
 
   use strict;
   use warnings;
+  use Data::Dumper;
   use Bio::Sketch::Perl;
 
   my $msh1 = Bio::Sketch::Perl->new("file1.fastq.gz");
@@ -53,6 +54,30 @@ A module for sketching with pure perl
   # Get a value between zero and one, where zero
   # indicates the same sketch profile.
   my $distHash = $msh->dist($msh2);
+
+  # Saving a sketch with Data::Dumper
+  my $filename = "./file1.fastq.gz.dmp";
+  open(my $fh, '>', $filename) or die "ERROR writing to $filename: $!";
+  print $fh $filename;
+  close $fh;
+
+  # Loading a sketch from Data::Dumper is easier with
+  # a subroutine
+  sub openDmp{
+    my($file) = @_;
+    local $/ = undef;
+    open(my $fh, $file) or BAIL_OUT("ERROR: could not open $file: $!");
+    my $str = <$fh>;
+    close $fh;
+
+    # Avoid an error with the way Data::Dumper saves
+    # objects in the syntax of $VAR1 = ...
+    # by turning off strict for just this eval.
+    no strict;
+    my $obj = eval $str;
+    return $obj;
+  }
+  my $loadedSketch = openDmp($filename);
 
 =head1 DESCRIPTION
 
@@ -90,13 +115,13 @@ sub new{
     alphabet  => "ACGT",
     canonical => 1,  # boolean
     sketchSize=> 1000,
-    hashType  => "MurmurHash3_x64_128",
-    hashBits  => 64,
+    hashType  => "MurmurHash32",
+    hashBits  => 32,
     hashSeed  => 42,
     minCopies => 1, 
-    bloomFilter =>undef, # type Bloom::Filter
-    bloomFilterCapacity => 1e5,  # >1
-    bloomFilterErrorRate=> 1e-6, # between zero and one
+    #bloomFilter =>undef, # type Bloom::Filter
+    #bloomFilterCapacity => 1e5,  # >1
+    #bloomFilterErrorRate=> 1e-6, # between zero and one
     sketch    => {}, #  each element has keys
                      #  name    => original filename
                      #  length  => integer of estimated genome size
@@ -105,22 +130,22 @@ sub new{
   };
   
   # Set some things from $settings
-  for my $key(qw(sketchSize kmerlength minCopies)){
+  for my $key(qw(hashSeed sketchSize kmerlength minCopies)){
     if(defined($$settings{$key})){
       $$self{$key} = $$settings{$key};
     }
   }
 
-  $$self{bloomFilter} = Bloom::Filter->new(
-    capacity    => $$self{bloomFilterCapacity},
-    error_rate  => $$self{bloomFilterErrorRate},
-  );
+  #$$self{bloomFilter} = Bloom::Filter->new(
+  #  capacity    => $$self{bloomFilterCapacity},
+  #  error_rate  => $$self{bloomFilterErrorRate},
+  #);
   # Make the bloom filter a bit more deterministic
-  my $salts = $$self{bloomFilter}{salts};
-  $$self{bloomFilter}{salts} = [sort{ $a <=> $b } @$salts];
+  #my $salts = $$self{bloomFilter}{salts};
+  #$$self{bloomFilter}{salts} = [sort{ $a <=> $b } @$salts];
   # Avoid the warning that we are exceeding capacity
   # by setting the capacity after BF->new()
-  $$self{bloomFilter}{capacity} = 1e8;
+  #$$self{bloomFilter}{capacity} = 1e8;
 
   if(!defined($filename)){
     die "ERROR: no file was given to ".$class."->new";
@@ -198,7 +223,7 @@ sub sketch{
   # Here is the part where we only keep the min hashes
   my @minHash    = splice(@sortedHash,0,$$self{sketchSize});
 
-  $$self{bloomFilter}->add(@minHash);
+  #$$self{bloomFilter}->add(@minHash);
 
   my %sketch = (
     name   => $filename,
