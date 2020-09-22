@@ -92,11 +92,11 @@ but I implemented the same kind of idea.
 
 =over 
 
-=item Uses L<Bio::Kmer> to get kmers from a file
+* Uses L<Bio::Kmer> to get kmers from a file
 
-=item Gets a hash of each kmer with L<Digest::MurmurHash3::murmurhash32> (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
+* Gets a hash of each kmer with L<Digest::MurmurHash3::murmurhash32> (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
 
-=item After all hashes are added, they are sorted and the minimum integers are kept.
+* After all hashes are added, they are sorted and the minimum integers are kept.
 
 =back
 
@@ -375,7 +375,13 @@ MIT license.
 
 Author:  Lee Katz <lkatz@cdc.gov>
 
-For additional help, go to https://github.com/lskatz/bio--mash--perl
+=head1 SEE ALSO
+
+=over
+
+* L<Bio::Sketch>
+
+=back
 
 =cut
 
