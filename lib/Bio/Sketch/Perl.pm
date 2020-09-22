@@ -16,7 +16,7 @@ use Encode qw/encode decode/;
 
 &implements( 'Bio::Sketch' );
 
-our $VERSION = 0.5;
+our $VERSION = 0.5.1;
 
 our @EXPORT_OK = qw();
 
@@ -81,7 +81,24 @@ A module for sketching with pure perl
 
 =head1 DESCRIPTION
 
-TODO
+The idea here is to try to make functionality totally in perl if possible to avoid system calls.
+The truth though is that this implementation is slower and not compatible with Mash.
+However, I will accept pull requests as long as they are captured in some unit testing.
+
+=head2 Workflow
+
+I took a lot of short cuts and I probably will never get around to making sure it is compatible with Mash,
+but I implemented the same kind of idea.
+
+=over 
+
+=item Uses L<Bio::Kmer> to get kmers from a file
+
+=item Gets a hash of each kmer with L<Digest::MurmurHash3::murmurhash32> (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
+
+=item After all hashes are added, they are sorted and the minimum integers are kept.
+
+=back
 
 =head1 METHODS
 

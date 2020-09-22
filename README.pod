@@ -6,10 +6,11 @@ Bio::Sketch::Perl
 
 =head1 SYNOPSIS
 
-A module for sketching with pure perl.
+A module for sketching with pure perl
 
   use strict;
   use warnings;
+  use Data::Dumper;
   use Bio::Sketch::Perl;
 
   my $msh1 = Bio::Sketch::Perl->new("file1.fastq.gz");
@@ -19,10 +20,34 @@ A module for sketching with pure perl.
   # indicates the same sketch profile.
   my $distHash = $msh->dist($msh2);
 
+  # Saving a sketch with Data::Dumper
+  my $filename = "./file1.fastq.gz.dmp";
+  open(my $fh, '>', $filename) or die "ERROR writing to $filename: $!";
+  print $fh $filename;
+  close $fh;
+
+  # Loading a sketch from Data::Dumper is easier with
+  # a subroutine
+  sub openDmp{
+    my($file) = @_;
+    local $/ = undef;
+    open(my $fh, $file) or BAIL_OUT("ERROR: could not open $file: $!");
+    my $str = <$fh>;
+    close $fh;
+
+    # Avoid an error with the way Data::Dumper saves
+    # objects in the syntax of $VAR1 = ...
+    # by turning off strict for just this eval.
+    no strict;
+    my $obj = eval $str;
+    return $obj;
+  }
+  my $loadedSketch = openDmp($filename);
+
 =head1 DESCRIPTION
 
 The idea here is to try to make functionality totally in perl if possible to avoid system calls.
-The truth though is that this implementation is quite slow and is not compatible with Mash.
+The truth though is that this implementation is slower and not compatible with Mash.
 However, I will accept pull requests as long as they are captured in some unit testing.
 
 =head2 Workflow
@@ -30,11 +55,15 @@ However, I will accept pull requests as long as they are captured in some unit t
 I took a lot of short cuts and I probably will never get around to making sure it is compatible with Mash,
 but I implemented the same kind of idea.
 
-=item Uses Bio::Kmer to get kmers from a file
+=over 
 
-=item Gets a hash of each kmer with Digest::MurmurHash3::murmurhash32 (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
+=item Uses L<Bio::Kmer> to get kmers from a file
+
+=item Gets a hash of each kmer with L<Digest::MurmurHash3::murmurhash32> (This murmur3 implementation is actually in C; I was not able to find a pure perl version)
 
 =item After all hashes are added, they are sorted and the minimum integers are kept.
+
+=back
 
 =head1 METHODS
 
